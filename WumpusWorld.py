@@ -1,17 +1,19 @@
+import LCS
 from random import randint, sample
 
-DIRECTIONS = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
-ARROWS = {(-1, 0): "^", (1, 0): "v", (0, -1): "<", (0, 1): ">"}
+DIRECTIONS = {"up": (-1, 0), "right": (0, 1), "down": (1, 0), "left": (0, -1)}
+ARROWS = {(-1, 0): "^", (0, 1): ">", (1, 0): "v", (0, -1): "<"}
 
 BATCH_SIZE = 100
 
 class WumpusWorld:
     def __init__(self, n_worlds=BATCH_SIZE):
-        self.worlds = [World() for i in range(n_worlds)]
-        self.player = None
+        self.training_set = [World() for i in range(n_worlds)]
+        self.validation_set = [World() for i in range(n_worlds)]
+        self.lcs = None
 
 class World:
-    def __init__(self, n_pits=3, min_path_len=3, max_path_len=8, height=4, width=4):
+    def __init__(self, n_pits=3, max_path_len=8, height=4, width=4):
         self.height = height
         self.width = width
         self.n_pits = n_pits
@@ -25,7 +27,7 @@ class World:
 
         # generate potential winning path so every world is "solvable"
         winning_path = [self.player.pos]
-        path_len = randint(min_path_len, max_path_len)
+        path_len = randint(min(height, width), max_path_len)
         while len(winning_path) < path_len:
             direction = sample(list(DIRECTIONS.values()), 1)[0]
             tmp_pos = (winning_path[-1][0] + direction[0], winning_path[-1][1] + direction[1])
@@ -44,10 +46,10 @@ class World:
         self.pits = []
         while len(self.pits) < self.n_pits:
             tmp_pos = (randint(0, self.height - 1), randint(0, self.width - 1))
-            if tmp_pos not in winning_path and tmp_pos != self.wumpus_pos:
+            if tmp_pos not in winning_path and tmp_pos != self.wumpus_pos and tmp_pos not in self.pits:
                 self.pits.append(tmp_pos)
 
-        # generate stench and breeze
+        # generate stench, breeze and glitter
 
         # generate grid
         for h in range(self.height):
@@ -57,32 +59,47 @@ class World:
                 line.append(cell)
             self.environment.append(line)
 
+        self.environment[self.gold_pos[0]][self.gold_pos[1]].append("glitter")
+
+        self.environment[self.wumpus_pos[0]][self.wumpus_pos[1]].append("stench")
         for d in DIRECTIONS.values():
             tmp_pos = (self.wumpus_pos[0] + d[0], self.wumpus_pos[1] + d[1])
             if 0 <= tmp_pos[0] < self.height and 0 <= tmp_pos[1] < self.width:
                 if "Stench" not in self.environment[tmp_pos[0]][tmp_pos[1]]:
-                    self.environment[tmp_pos[0]][tmp_pos[1]].append("Stench")
+                    self.environment[tmp_pos[0]][tmp_pos[1]].append("stench")
+
         for p in self.pits:
             for d in DIRECTIONS.values():
                 tmp_pos = (p[0] + d[0], p[1] + d[1])
                 if 0 <= tmp_pos[0] < self.height and 0 <= tmp_pos[1] < self.width:
                     if "Breeze" not in self.environment[tmp_pos[0]][tmp_pos[1]]:
-                        self.environment[tmp_pos[0]][tmp_pos[1]].append("Breeze")
+                        self.environment[tmp_pos[0]][tmp_pos[1]].append("breeze")
 
+        # add "at_start" on starting point
+        self.environment[self.player.pos[0]][self.player.pos[1]].append("at_start")
 
     def move_player(self):
         tmp_pos = (self.player.pos[0] + self.player.p_dir[0], self.player.pos[1] + self.player.p_dir[1])
         if 0 <= tmp_pos[0] < self.height and 0 <= tmp_pos[1] < self.width:
-            if tmp_pos not in self.pits and tmp_pos != self.wumpus_pos:
+            if tmp_pos not in self.pits and (self.wumpus_pos is None or tmp_pos != self.wumpus_pos):
                 self.player.pos = tmp_pos
                 return True
             else:
-                # game over
-                return False
-        raise Warning("Failed to move player as move was out of bounds")
+                raise Warning("GAME OVER")
+        # bump
+        return False
 
-    def turn_player(self, new_direction):
-        self.player.p_dir = new_direction
+    def turn_player(self, rotation):
+        clockwise = list(DIRECTIONS.values())
+        index = clockwise.index(self.player.p_dir)
+        match rotation:
+            case "right":
+                new_dir = clockwise[(index+1) % 4]
+            case "left":
+                new_dir = clockwise[(index+3) % 4]
+            case _:
+                raise ValueError("INVALID ROTATION")
+        self.player.p_dir = new_dir
 
     def print_world(self):
         for h in range(self.height):
@@ -109,8 +126,4 @@ class Player:
         self.pos = pos
         self.p_dir = p_dir
         self.has_gold = False
-        self.has_arrow = False
-
-ww = WumpusWorld()
-for w in ww.worlds:
-    w.print_world()
+        self.has_arrow = True
