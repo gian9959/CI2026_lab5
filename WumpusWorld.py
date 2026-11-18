@@ -14,6 +14,7 @@ class World:
         self.n_pits = n_pits
         self.pits = []
         self.player_pos = (3,0)
+        self.player_dir = DIRECTIONS["right"]
         self.gold_pos = None
         self.wumpus_pos = None
 
@@ -51,7 +52,15 @@ class World:
                 tmp_pos = (h, w)
                 match tmp_pos:
                     case self.player_pos:
-                        char = "P"
+                        match self.player_dir:
+                            case DIRECTIONS["up"]:
+                                char = "^"
+                            case DIRECTIONS["down"]:
+                                char = "v"
+                            case DIRECTIONS["left"]:
+                                char = "<"
+                            case DIRECTIONS["right"]:
+                                char = ">"
                     case self.wumpus_pos:
                         char = "W"
                     case self.gold_pos:
