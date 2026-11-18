@@ -4,7 +4,7 @@ DIRECTIONS = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
 
 class WumpusWorld:
     def __init__(self, n_worlds=100):
-        self.worlds = [w for w in range(n_worlds)]
+        self.worlds = [World() for i in range(n_worlds)]
         self.player = None
 
 class World:
@@ -25,14 +25,14 @@ class World:
         while len(winning_path) < path_len:
             direction = sample(list(DIRECTIONS.values()), 1)[0]
             tmp_pos = (winning_path[-1][0] + direction[0], winning_path[-1][1] + direction[1])
-            if (tmp_pos[0] <= self.height and tmp_pos[1] <= self.width) and (tmp_pos != self.player_pos):
+            if (0 < tmp_pos[0] < self.height and 0 < tmp_pos[1] < self.width) and tmp_pos != self.player_pos:
                 winning_path.append(tmp_pos)
         self.gold_pos = winning_path[-1]
 
         # generate wumpus
         while True:
             tmp_pos = (randint(0, self.height - 1), randint(0, self.width - 1))
-            if tmp_pos not in winning_path and tmp_pos != self.player_pos:
+            if tmp_pos not in winning_path:
                 self.wumpus_pos = tmp_pos
                 break
 
@@ -40,7 +40,29 @@ class World:
         self.pits = []
         while len(self.pits) < self.n_pits:
             tmp_pos = (randint(0, self.height - 1), randint(0, self.width - 1))
-            if tmp_pos not in winning_path and tmp_pos != self.player_pos and tmp_pos != self.wumpus_pos:
+            if tmp_pos not in winning_path and tmp_pos != self.wumpus_pos:
                 self.pits.append(tmp_pos)
 
+    def print_world(self):
+        for h in range(self.height):
+            line = ""
+            for w in range(self.width):
+                char = "."
+                tmp_pos = (h, w)
+                match tmp_pos:
+                    case self.player_pos:
+                        char = "P"
+                    case self.wumpus_pos:
+                        char = "W"
+                    case self.gold_pos:
+                        char = "G"
+                    case _:
+                        if tmp_pos in self.pits:
+                            char = "x"
+                line += char
+            print(line)
+        print()
+
 ww = WumpusWorld()
+for w in ww.worlds:
+    w.print_world()
