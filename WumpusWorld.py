@@ -4,6 +4,8 @@ from random import randint, sample
 DIRECTIONS = {"up": (-1, 0), "right": (0, 1), "down": (1, 0), "left": (0, -1)}
 ARROWS = {(-1, 0): "^", (0, 1): ">", (1, 0): "v", (0, -1): "<"}
 
+START_POS = (3, 0)
+
 BATCH_SIZE = 100
 
 class WumpusWorld:
@@ -22,6 +24,9 @@ class World:
         self.wumpus_pos = None
         self.pits = []
         self.environment = []
+
+        self.bump = False
+        self.scream = False
 
         # random generation of a world
 
@@ -55,28 +60,26 @@ class World:
         for h in range(self.height):
             line = []
             for w in range(self.width):
-                cell = []
+                cell = set()
                 line.append(cell)
             self.environment.append(line)
 
-        self.environment[self.gold_pos[0]][self.gold_pos[1]].append("glitter")
+        self.environment[self.gold_pos[0]][self.gold_pos[1]].add("glitter")
 
-        self.environment[self.wumpus_pos[0]][self.wumpus_pos[1]].append("stench")
+        self.environment[self.wumpus_pos[0]][self.wumpus_pos[1]].add("stench")
         for d in DIRECTIONS.values():
             tmp_pos = (self.wumpus_pos[0] + d[0], self.wumpus_pos[1] + d[1])
             if 0 <= tmp_pos[0] < self.height and 0 <= tmp_pos[1] < self.width:
-                if "Stench" not in self.environment[tmp_pos[0]][tmp_pos[1]]:
-                    self.environment[tmp_pos[0]][tmp_pos[1]].append("stench")
+                self.environment[tmp_pos[0]][tmp_pos[1]].add("stench")
 
         for p in self.pits:
             for d in DIRECTIONS.values():
                 tmp_pos = (p[0] + d[0], p[1] + d[1])
                 if 0 <= tmp_pos[0] < self.height and 0 <= tmp_pos[1] < self.width:
-                    if "Breeze" not in self.environment[tmp_pos[0]][tmp_pos[1]]:
-                        self.environment[tmp_pos[0]][tmp_pos[1]].append("breeze")
+                    self.environment[tmp_pos[0]][tmp_pos[1]].add("breeze")
 
         # add "at_start" on starting point
-        self.environment[self.player.pos[0]][self.player.pos[1]].append("at_start")
+        self.environment[self.player.pos[0]][self.player.pos[1]].add("at_start")
 
     def move_player(self):
         tmp_pos = (self.player.pos[0] + self.player.p_dir[0], self.player.pos[1] + self.player.p_dir[1])
@@ -86,7 +89,8 @@ class World:
                 return True
             else:
                 raise Warning("GAME OVER")
-        # bump
+        # bumped into a wall
+        self.bump = True
         return False
 
     def turn_player(self, rotation):
@@ -100,6 +104,22 @@ class World:
             case _:
                 raise ValueError("INVALID ROTATION")
         self.player.p_dir = new_dir
+
+    def player_perception(self):
+        p = set(self.environment[self.player.pos[0]][self.player.pos[1]])
+        if self.wumpus_pos is None:
+            p.discard("stench")
+        if self.gold_pos is None:
+            p.discard("glitter")
+        if self.bump:
+            p.add("bump")
+            self.bump = False
+        if self.scream:
+            p.add("scream")
+            self.scream = False
+        if self.player.pos == START_POS:
+            p.add("at_start")
+        return p
 
     def print_world(self):
         for h in range(self.height):
@@ -122,7 +142,7 @@ class World:
         print()
 
 class Player:
-    def __init__(self, pos=(3,0), p_dir=DIRECTIONS["right"]):
+    def __init__(self, pos=START_POS, p_dir=DIRECTIONS["right"]):
         self.pos = pos
         self.p_dir = p_dir
         self.has_gold = False
