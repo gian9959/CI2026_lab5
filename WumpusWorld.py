@@ -1,4 +1,4 @@
-import LCS
+from LCS import LCS
 from random import randint, sample
 
 DIRECTIONS = {"up": (-1, 0), "right": (0, 1), "down": (1, 0), "left": (0, -1)}
@@ -6,15 +6,53 @@ ARROWS = {(-1, 0): "^", (0, 1): ">", (1, 0): "v", (0, -1): "<"}
 
 START_POS = (3, 0)
 
+MAX_STEPS = 100
+
+# REWARDS
+R_STEP = -1
+R_SHOOT = -10
+R_DEATH = -1000
+R_WIN = 1000
+
 BATCH_SIZE = 100
 
 class WumpusWorld:
     def __init__(self, n_worlds=BATCH_SIZE):
-        self.training_set = [World() for i in range(n_worlds)]
-        self.validation_set = [World() for i in range(n_worlds)]
-        self.lcs = None
+        self.training_set = [Level() for _ in range(n_worlds)]
+        self.validation_set = [Level() for _ in range(n_worlds)]
+        self.lcs = LCS()
 
-class World:
+        self.stats = {"WINS": 0, "LOSSES": 0, "FAILED": 0}
+
+    def play_level(self, level, train):
+        self.lcs.reset()
+        percepts = level.player_perception()
+        total = 0.0
+        end = False
+        while not end:
+            action = self.lcs.act(percepts, train)
+            percepts, reward, end = level.step(action)
+            if train:
+                self.lcs.reinforce(reward, end)
+            total += reward
+        match level.outcome:
+            case "SUCCESS":
+                self.stats["WINS"] += 1
+            case "DEAD":
+                self.stats["LOSSES"] += 1
+            case "FAILED":
+                self.stats["FAILED"] += 1
+        return total, level.outcome
+
+    def train(self):
+        print("!!!TRAINING!!!")
+        for i, level in enumerate(self.training_set):
+            total, outcome = self.play_level(level, train=True)
+            self.lcs.evolve()
+            print(f"Training on level {i}: {outcome} ({total})")
+
+
+class Level:
     def __init__(self, n_pits=3, max_path_len=8, height=4, width=4):
         self.height = height
         self.width = width
@@ -28,9 +66,12 @@ class World:
         self.bump = False
         self.scream = False
 
-        # random generation of a world
+        self.steps = 0
+        self.outcome = "FAILED"
 
-        # generate potential winning path so every world is "solvable"
+        # random generation of a level
+
+        # generate potential winning path so every level is "solvable"
         winning_path = [self.player.pos]
         path_len = randint(min(height, width), max_path_len)
         while len(winning_path) < path_len:
@@ -81,6 +122,45 @@ class World:
         # add "at_start" on starting point
         self.environment[self.player.pos[0]][self.player.pos[1]].add("at_start")
 
+    def step(self, action):
+        self.steps += 1
+        reward = R_STEP
+        end = False
+        self.bump = False
+        self.scream = False
+        try:
+            match action:
+                case "fwd":
+                    if not self.move_player():
+                        self.bump = True
+                case "turn_l":
+                    self.turn_player("left")
+                case "turn_r":
+                    self.turn_player("right")
+                case "grab":
+                    if self.player.pos == self.gold_pos and not self.player.has_gold:
+                        self.player.has_gold = True
+                        self.gold_pos = None
+                case "shoot":
+                    if self.player_shoot():
+                        reward += R_SHOOT
+                case "climb":
+                    if self.player.pos == START_POS and self.player.has_gold:
+                        reward = R_WIN
+                        end = True
+                        self.outcome = "SUCCESS"
+                case _:
+                    raise ValueError(f"INVALID ACTION {action}")
+        # GAME OVER
+        except Warning:
+            reward = R_DEATH
+            end = True
+            self.outcome = "DEAD"
+        if not end and self.steps >= MAX_STEPS:
+            end = True
+        return self.player_perception(), reward, end
+
+
     def move_player(self):
         tmp_pos = (self.player.pos[0] + self.player.p_dir[0], self.player.pos[1] + self.player.p_dir[1])
         if 0 <= tmp_pos[0] < self.height and 0 <= tmp_pos[1] < self.width:
@@ -105,6 +185,21 @@ class World:
                 raise ValueError("INVALID ROTATION")
         self.player.p_dir = new_dir
 
+    def player_shoot(self):
+        if not self.player.has_arrow:
+            return False
+        self.player.has_arrow = False
+        p_pos = self.player.pos
+        p_dir = self.player.p_dir
+        target = (p_pos[0] + p_dir[0], p_pos[1] + p_dir[1])
+        while 0 <= target[0] < self.height and 0 <= target[1] < self.width:
+            if target == self.wumpus_pos:
+                self.wumpus_pos = None
+                self.scream = True
+                break
+            target = (target[0] + p_dir[0], target[1] + p_dir[1])
+        return True
+
     def player_perception(self):
         p = set(self.environment[self.player.pos[0]][self.player.pos[1]])
         if self.wumpus_pos is None:
@@ -113,10 +208,8 @@ class World:
             p.discard("glitter")
         if self.bump:
             p.add("bump")
-            self.bump = False
         if self.scream:
             p.add("scream")
-            self.scream = False
         if self.player.pos == START_POS:
             p.add("at_start")
         return p
@@ -147,3 +240,16 @@ class Player:
         self.p_dir = p_dir
         self.has_gold = False
         self.has_arrow = True
+
+if __name__ == "__main__":
+    ww = WumpusWorld()
+    ww.train()
+    print()
+    print("---OUTCOMES---")
+    print(ww.stats)
+    print()
+    print("---BEST RULES---")
+    for i, c in enumerate(ww.lcs.best_rules()):
+        print(f"{i+1}: {c}")
+        print(f"strength: {c.strength}")
+        print()

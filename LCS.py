@@ -1,4 +1,4 @@
-from random import sample, choices
+from random import sample, choices, choice
 
 N_RULES = 200
 
@@ -46,7 +46,7 @@ class LCS:
 
     def act(self, percepts, train=True):
         # msgs from environment + internal ones
-        msg = {SENSOR_MSGS[p] for p in percepts} | self.internal_msgs
+        msg = set(percepts) | self.internal_msgs
 
         # match rules
         matched = [c for c in self.class_pop if c.matches(msg)]
@@ -54,6 +54,11 @@ class LCS:
         eff = [c for c in matched if c.out in EFFECTOR_MSGS]
         # all matching rules that add an internal message
         inn = [c for c in matched if c.out not in EFFECTOR_MSGS]
+
+        # if no action is available choose a random action
+        if not eff:
+            self.reset()
+            return choice(EFFECTOR_MSGS)
 
         # select rule for action (weighted probability)
         action = choices(eff, [c.strength for c in eff])[0]
@@ -94,6 +99,46 @@ class LCS:
         for c in self.class_pop:
             c.strength = min(MAX_STRENGTH, max(MIN_STRENGTH, c.strength))
 
+    def evolve(self, n_children=2):
+        for _ in range(n_children):
+            # select first parent randomly (weighted probability)
+            a = choices(self.class_pop, [c.strength for c in self.class_pop])[0]
+
+            # second parent selected by the same output of first parent (weighted probability)
+            same_out = [c for c in self.class_pop if c.out == a.out and c is not a]
+            if not same_out:
+                continue
+            b = choices(same_out, [c.strength for c in same_out])[0]
+
+            pos = set(a.pos_cond) | set(b.pos_cond)
+            neg = set(a.neg_cond) | set(b.neg_cond)
+            # if a condition appears in both pos and neg, discard it
+            both = pos & neg
+            pos -= both
+            neg -= both
+            if not pos and not neg:
+                continue
+
+            pos = sorted(pos)
+            neg = sorted(neg)
+
+            # check if rule already exists
+            exists = False
+            for c in self.class_pop:
+                if c.out == a.out and sorted(c.pos_cond) == pos and sorted(c.neg_cond) == neg:
+                    exists = True
+                    break
+            if exists:
+                continue
+
+            # children replaces weakest rule
+            victim = self.class_pop.index(min(self.class_pop, key=lambda c: c.strength))
+            self.class_pop[victim] = Classifier(pos, neg, a.out, INIT_STRENGTH)
+
+    def best_rules(self, n=10):
+        return sorted(self.class_pop, key=lambda c: c.strength, reverse=True)[:n]
+
+
 class Classifier:
     def __init__(self, pos_cond, neg_cond, out, strength):
         self.pos_cond = pos_cond
@@ -119,3 +164,7 @@ class Classifier:
                 rule_match = False
                 break
         return rule_match
+
+    def __str__(self):
+        cond = list(self.pos_cond) + ["NOT " + n for n in self.neg_cond]
+        return f"{' & '.join(cond)} -> {self.out}"
