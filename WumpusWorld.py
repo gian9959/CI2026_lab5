@@ -50,6 +50,7 @@ class WumpusWorld:
     def train(self):
         # print("!!!TRAINING!!!")
         for i, level in enumerate(self.training_set):
+            level.reset()
             total, outcome = self.play_level(level, train=True)
             self.lcs.evolve()
             # print(f"Training on level {i}: {outcome} ({total})")
@@ -57,6 +58,7 @@ class WumpusWorld:
     def validate(self):
         # print("!!!VALIDATION!!!")
         for i, level in enumerate(self.validation_set):
+            level.reset()
             total, outcome = self.play_level(level, train=False)
             # print(f"VALIDATING on level {i}: {outcome} ({total})")
 
@@ -70,7 +72,9 @@ class Level:
         self.width = width
         self.n_pits = n_pits
         self.player = Player()
+        self.is_gold = True
         self.gold_pos = None
+        self.is_wumpus = True
         self.wumpus_pos = None
         self.pits = []
         self.environment = []
@@ -134,6 +138,11 @@ class Level:
         # add "at_start" on starting point
         self.environment[self.player.pos[0]][self.player.pos[1]].add("at_start")
 
+    def reset(self):
+        self.is_gold = True
+        self.is_wumpus = True
+        self.player = Player()
+
     def step(self, action):
         self.steps += 1
         reward = R_STEP
@@ -152,7 +161,7 @@ class Level:
                 case "grab":
                     if self.player.pos == self.gold_pos and not self.player.has_gold:
                         self.player.has_gold = True
-                        self.gold_pos = None
+                        self.is_gold = False
                 case "shoot":
                     if self.player_shoot():
                         reward += R_SHOOT
@@ -206,7 +215,7 @@ class Level:
         target = (p_pos[0] + p_dir[0], p_pos[1] + p_dir[1])
         while 0 <= target[0] < self.height and 0 <= target[1] < self.width:
             if target == self.wumpus_pos:
-                self.wumpus_pos = None
+                self.is_wumpus = False
                 self.scream = True
                 break
             target = (target[0] + p_dir[0], target[1] + p_dir[1])
