@@ -223,9 +223,9 @@ class Level:
 
     def player_perception(self):
         p = set(self.environment[self.player.pos[0]][self.player.pos[1]])
-        if self.wumpus_pos is None:
+        if self.is_wumpus:
             p.discard("stench")
-        if self.gold_pos is None:
+        if self.is_gold:
             p.discard("glitter")
         if self.bump:
             p.add("bump")
