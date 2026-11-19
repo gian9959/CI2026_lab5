@@ -256,6 +256,7 @@ if __name__ == "__main__":
     for i in range(EPOCHS):
         print(f"EPOCH: {i+1}")
 
+        ww.reset()
         ww.train()
         tr_stats = ww.stats
         # print()
