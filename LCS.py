@@ -138,7 +138,6 @@ class LCS:
     def best_rules(self, n=10):
         return sorted(self.class_pop, key=lambda c: c.strength, reverse=True)[:n]
 
-
 class Classifier:
     def __init__(self, pos_cond, neg_cond, out, strength):
         self.pos_cond = pos_cond

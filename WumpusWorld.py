@@ -14,7 +14,7 @@ R_SHOOT = -10
 R_DEATH = -1000
 R_WIN = 1000
 
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 
 class WumpusWorld:
     def __init__(self, n_worlds=BATCH_SIZE):
@@ -51,6 +51,15 @@ class WumpusWorld:
             self.lcs.evolve()
             print(f"Training on level {i}: {outcome} ({total})")
 
+    def validate(self):
+        print("!!!VALIDATION!!!")
+        for i, level in enumerate(self.validation_set):
+            total, outcome = self.play_level(level, train=False)
+            print(f"VALIDATING on level {i}: {outcome} ({total})")
+
+    def reset(self):
+        self.stats = {"WINS": 0, "LOSSES": 0, "FAILED": 0}
+        self.lcs.reset()
 
 class Level:
     def __init__(self, n_pits=3, max_path_len=8, height=4, width=4):
@@ -244,12 +253,24 @@ class Player:
 if __name__ == "__main__":
     ww = WumpusWorld()
     ww.train()
+    tr_stats = ww.stats
     print()
-    print("---OUTCOMES---")
-    print(ww.stats)
+
+    ww.reset()
+    ww.validate()
+    vl_stats = ww.stats
     print()
+
+    print("---TRAINING OUTCOMES---")
+    print(tr_stats)
+    print()
+
+    print("---VALIDATION OUTCOMES---")
+    print(vl_stats)
+    print()
+
     print("---BEST RULES---")
     for i, c in enumerate(ww.lcs.best_rules()):
-        print(f"{i+1}: {c}")
+        print(f"{i + 1}: {c}")
         print(f"strength: {c.strength}")
         print()
