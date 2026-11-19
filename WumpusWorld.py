@@ -9,12 +9,13 @@ START_POS = (3, 0)
 MAX_STEPS = 100
 
 # REWARDS
-R_STEP = -1
-R_SHOOT = -10
+R_STEP = -10
+R_SHOOT = -100
 R_DEATH = -1000
 R_WIN = 1000
 
-BATCH_SIZE = 1000
+BATCH_SIZE = 500
+EPOCHS = 10
 
 class WumpusWorld:
     def __init__(self, n_worlds=BATCH_SIZE):
@@ -45,17 +46,17 @@ class WumpusWorld:
         return total, level.outcome
 
     def train(self):
-        print("!!!TRAINING!!!")
+        # print("!!!TRAINING!!!")
         for i, level in enumerate(self.training_set):
             total, outcome = self.play_level(level, train=True)
             self.lcs.evolve()
-            print(f"Training on level {i}: {outcome} ({total})")
+            # print(f"Training on level {i}: {outcome} ({total})")
 
     def validate(self):
-        print("!!!VALIDATION!!!")
+        # print("!!!VALIDATION!!!")
         for i, level in enumerate(self.validation_set):
             total, outcome = self.play_level(level, train=False)
-            print(f"VALIDATING on level {i}: {outcome} ({total})")
+            # print(f"VALIDATING on level {i}: {outcome} ({total})")
 
     def reset(self):
         self.stats = {"WINS": 0, "LOSSES": 0, "FAILED": 0}
@@ -252,22 +253,25 @@ class Player:
 
 if __name__ == "__main__":
     ww = WumpusWorld()
-    ww.train()
-    tr_stats = ww.stats
-    print()
+    for i in range(EPOCHS):
+        print(f"EPOCH: {i+1}")
 
-    ww.reset()
-    ww.validate()
-    vl_stats = ww.stats
-    print()
+        ww.train()
+        tr_stats = ww.stats
+        # print()
 
-    print("---TRAINING OUTCOMES---")
-    print(tr_stats)
-    print()
+        ww.reset()
+        ww.validate()
+        vl_stats = ww.stats
+        # print()
 
-    print("---VALIDATION OUTCOMES---")
-    print(vl_stats)
-    print()
+        print("---TRAINING OUTCOMES---")
+        print(tr_stats)
+        print()
+
+        print("---VALIDATION OUTCOMES---")
+        print(vl_stats)
+        print()
 
     print("---BEST RULES---")
     for i, c in enumerate(ww.lcs.best_rules()):
