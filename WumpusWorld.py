@@ -1,3 +1,5 @@
+from matplotlib import pyplot
+
 from LCS import LCS
 from random import randint, sample
 
@@ -15,7 +17,7 @@ R_DEATH = -1000
 R_WIN = 1000
 
 BATCH_SIZE = 500
-EPOCHS = 10
+EPOCHS = 20
 
 class WumpusWorld:
     def __init__(self, n_worlds=BATCH_SIZE):
@@ -253,17 +255,21 @@ class Player:
 
 if __name__ == "__main__":
     ww = WumpusWorld()
+    tr_results = []
+    vl_results = []
     for i in range(EPOCHS):
         print(f"EPOCH: {i+1}")
 
         ww.reset()
         ww.train()
         tr_stats = ww.stats
+        tr_results.append(tr_stats)
         # print()
 
         ww.reset()
         ww.validate()
         vl_stats = ww.stats
+        vl_results.append(vl_stats)
         # print()
 
         print("---TRAINING OUTCOMES---")
@@ -279,3 +285,18 @@ if __name__ == "__main__":
         print(f"{i + 1}: {c}")
         print(f"strength: {c.strength}")
         print()
+
+    pyplot.plot(range(EPOCHS), [w['WINS'] for w in tr_results], 'r',
+                    range(EPOCHS), [w['WINS'] for w in vl_results], 'g',)
+    pyplot.title("WINS")
+    pyplot.show()
+
+    pyplot.plot(range(EPOCHS), [w['LOSSES'] for w in tr_results], 'r',
+                range(EPOCHS), [w['LOSSES'] for w in vl_results], 'g', )
+    pyplot.title("LOSSES")
+    pyplot.show()
+
+    pyplot.plot(range(EPOCHS), [w['FAILED'] for w in tr_results], 'r',
+                range(EPOCHS), [w['FAILED'] for w in vl_results], 'g', )
+    pyplot.title("FAILED")
+    pyplot.show()
